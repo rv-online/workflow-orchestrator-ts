@@ -6,12 +6,40 @@ export interface WorkflowTask {
   id: string;
   dependsOn?: string[];
   retries?: number;
+  timeoutMs?: number;
   run: (context: WorkflowContext) => Promise<unknown>;
+}
+
+export interface TaskStatus {
+  attempts: number;
+  status: "success" | "failed";
+  lastError?: string;
 }
 
 export interface ExecutionResult {
   outputs: Record<string, unknown>;
   trace: string[];
+  statuses: Record<string, TaskStatus>;
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs?: number): Promise<T> {
+  if (!timeoutMs) {
+    return promise;
+  }
+
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`task timed out after ${timeoutMs}ms`)), timeoutMs);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
 }
 
 export async function executeWorkflow(tasks: WorkflowTask[]): Promise<ExecutionResult> {
@@ -20,6 +48,7 @@ export async function executeWorkflow(tasks: WorkflowTask[]): Promise<ExecutionR
   const completed = new Set<string>();
   const context: WorkflowContext = { values: new Map() };
   const trace: string[] = [];
+  const statuses = new Map<string, TaskStatus>();
 
   while (pending.size > 0) {
     const ready = [...pending]
@@ -37,15 +66,18 @@ export async function executeWorkflow(tasks: WorkflowTask[]): Promise<ExecutionR
         try {
           attempt += 1;
           trace.push(`start:${task.id}:attempt:${attempt}`);
-          const output = await task.run(context);
+          const output = await withTimeout(task.run(context), task.timeoutMs);
           context.values.set(task.id, output);
           trace.push(`success:${task.id}:attempt:${attempt}`);
+          statuses.set(task.id, { attempts: attempt, status: "success" });
           completed.add(task.id);
           pending.delete(task.id);
           break;
         } catch (error) {
-          trace.push(`error:${task.id}:attempt:${attempt}`);
+          const message = error instanceof Error ? error.message : String(error);
+          trace.push(`error:${task.id}:attempt:${attempt}:${message}`);
           if (attempt > retries) {
+            statuses.set(task.id, { attempts: attempt, status: "failed", lastError: message });
             throw error;
           }
         }
@@ -53,5 +85,9 @@ export async function executeWorkflow(tasks: WorkflowTask[]): Promise<ExecutionR
     }
   }
 
-  return { outputs: Object.fromEntries(context.values), trace };
+  return {
+    outputs: Object.fromEntries(context.values),
+    trace,
+    statuses: Object.fromEntries(statuses),
+  };
 }

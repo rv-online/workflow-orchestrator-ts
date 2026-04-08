@@ -3,18 +3,22 @@ import { executeWorkflow, type WorkflowTask } from "./workflow.js";
 const tasks: WorkflowTask[] = [
   {
     id: "extract",
-    run: async () => ["order-1", "order-2", "order-3"],
+    run: async () => ["acct-101", "acct-102"],
   },
   {
-    id: "transform",
+    id: "score",
     dependsOn: ["extract"],
-    run: async (context) => (context.values.get("extract") as string[]).map((item) => item.toUpperCase()),
+    run: async (context) => {
+      const customers = context.values.get("extract") as string[];
+      return customers.map((customerId, index) => ({ customerId, score: 80 + index * 10 }));
+    },
   },
   {
-    id: "load",
-    dependsOn: ["transform"],
+    id: "publish",
+    dependsOn: ["score"],
     run: async (context) => ({
-      loadedCount: (context.values.get("transform") as string[]).length,
+      published: true,
+      rows: (context.values.get("score") as Array<unknown>).length,
     }),
   },
 ];
