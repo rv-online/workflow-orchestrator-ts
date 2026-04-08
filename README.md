@@ -1,8 +1,24 @@
 # Workflow Orchestrator TS
 
-TypeScript workflow engine that executes DAG tasks with dependency resolution, retry handling, timeout guards, ready-group scheduling, and execution metadata. It reads more like the core of a job runner or internal platform service.
+TypeScript workflow engine for DAG execution, dependency validation, retry handling, timeouts, and execution tracing.
 
-## Scripts
+## Why This Exists
+
+This repo is meant to feel like the core of an internal job runner where correctness, sequencing, and observability matter.
+
+## What This Demonstrates
+
+- dependency resolution and invalid-graph detection
+- retry, timeout, and execution-status reporting
+- execution traces that make orchestration behavior reviewable
+
+## Architecture
+
+1. workflow tasks are registered with dependencies and runtime policies
+1. the executor computes ready work, runs tasks, and captures detailed trace state
+1. outputs summarize statuses, ordering, and task results for operators
+
+## Run It
 
 ```bash
 npm test
@@ -10,11 +26,6 @@ npm run build
 node dist/src/index.js
 ```
 
-## Concepts Demonstrated
+## Verification
 
-- topological dependency resolution
-- retry policies and attempt accounting
-- timeout enforcement for slow tasks
-- dependency validation before execution
-- execution trace, ready groups, and status reporting
-- deterministic tests for orchestration behavior
+Use `npm test` and `npm run build`, then run the sample execution path for a concrete trace output.
