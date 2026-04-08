@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js",
+    "start": "node dist/src/index.js",
+    "bench": "node dist/src/benchmark.js",
     "test": "node --test --import tsx test/**/*.test.ts"
   },
   "devDependencies": {

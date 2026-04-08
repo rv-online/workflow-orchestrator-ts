@@ -21,6 +21,8 @@ test("executes dependent tasks and records statuses", async () => {
   assert.equal(result.trace[0], "start:extract:attempt:1");
   assert.deepEqual(result.executionOrder, ["extract", "transform"]);
   assert.deepEqual(result.readyGroups, [["extract"], ["transform"]]);
+  assert.equal(result.summary.taskCount, 2);
+  assert.equal(result.summary.failedCount, 0);
 });
 
 test("retries failed tasks before succeeding", async () => {
@@ -70,4 +72,25 @@ test("rejects missing dependencies before execution", async () => {
     ]),
     /missing dependency/
   );
+});
+
+test("runs independent tasks within the same layer", async () => {
+  const result = await executeWorkflow([
+    {
+      id: "a",
+      metadata: { priority: 1 },
+      run: async () => "A",
+    },
+    {
+      id: "b",
+      metadata: { priority: 2 },
+      run: async () => "B",
+    },
+  ]);
+
+  assert.deepEqual(result.readyGroups, [["b", "a"]]);
+  assert.equal(result.summary.readyLayerCount, 1);
+  assert.equal(result.summary.maxLayerWidth, 2);
+  assert.equal(result.outputs.a, "A");
+  assert.equal(result.outputs.b, "B");
 });
