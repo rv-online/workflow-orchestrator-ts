@@ -6,6 +6,7 @@ test("executes dependent tasks and records statuses", async () => {
   const result = await executeWorkflow([
     {
       id: "extract",
+      metadata: { owner: "data-platform", priority: 2 },
       run: async () => [1, 2, 3],
     },
     {
@@ -18,6 +19,8 @@ test("executes dependent tasks and records statuses", async () => {
   assert.deepEqual(result.outputs.transform, [2, 4, 6]);
   assert.equal(result.statuses.extract.status, "success");
   assert.equal(result.trace[0], "start:extract:attempt:1");
+  assert.deepEqual(result.executionOrder, ["extract", "transform"]);
+  assert.deepEqual(result.readyGroups, [["extract"], ["transform"]]);
 });
 
 test("retries failed tasks before succeeding", async () => {
@@ -53,5 +56,18 @@ test("fails timed out tasks with a clear error", async () => {
       },
     ]),
     /timed out/
+  );
+});
+
+test("rejects missing dependencies before execution", async () => {
+  await assert.rejects(
+    executeWorkflow([
+      {
+        id: "load",
+        dependsOn: ["transform"],
+        run: async () => "ok",
+      },
+    ]),
+    /missing dependency/
   );
 });
